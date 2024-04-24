@@ -15,6 +15,7 @@
      ImportJSONViaPost     For use by end users to import a JSON feed from a URL using POST parameters
      ImportJSONAdvanced    For use by script developers to easily extend the functionality of this library
      ImportJSONBasicAuth   For use by end users to import a JSON feed from a URL with HTTP Basic Auth (added by Karsten Lettow)
+     ImportJSONCatalogIQ   For use by CatalogIQ Users to import API endpoint data. (added by Joshua Berkowitz)
 
   For future enhancements see https://github.com/bradjasper/ImportJSON/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement
   
@@ -249,6 +250,10 @@ function ImportJSONAdvanced(url, fetchOptions, query, parseOptions, includeFunc,
 function ImportJSONBasicAuth(url, username, password, query, parseOptions) {
   var encodedAuthInformation = Utilities.base64Encode(username + ":" + password);
   var header = {headers: {Authorization: "Basic " + encodedAuthInformation}};
+  return ImportJSONAdvanced(url, header, query, parseOptions, includeXPath_, defaultTransform_);
+}
+function ImportJSONCatalogIQ(url, api_key, query, parseOptions) {
+  var header = {headers: {"Catalogiq-Api-Key": api_key}};
   return ImportJSONAdvanced(url, header, query, parseOptions, includeXPath_, defaultTransform_);
 }
 
