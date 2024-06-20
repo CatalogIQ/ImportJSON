@@ -1,7 +1,7 @@
 /*====================================================================================================================================*
-  ImportJSON by Brad Jasper and Trevor Lohrbeer
+  ImportJSON by Brad Jasper and Trevor Lohrbeer and Joshua Berkowitz
   ====================================================================================================================================
-  Version:      1.5.0
+  Version:      1.5.1
   Project Page: https://github.com/bradjasper/ImportJSON
   Copyright:    (c) 2017-2019 by Brad Jasper
                 (c) 2012-2017 by Trevor Lohrbeer
@@ -247,6 +247,60 @@ function ImportJSONAdvanced(url, fetchOptions, query, parseOptions, includeFunc,
  * @return a two-dimensional array containing the data, with the first row containing headers
  * @customfunction
  **/
+function getHeaderMappings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const mappingsSheet = ss.getSheetByName("Mappings");
+  const mappingsRange = mappingsSheet.getDataRange();
+  const mappingsData = mappingsRange.getValues();
+  
+  let headerMapping = {};
+  for (let i = 0; i < mappingsData.length; i++) {
+    const originalHeader = mappingsData[i][0].toString().trim();
+    const newHeader = mappingsData[i][1].toString().trim();
+    if (newHeader) { // Ensure there's a mapped value
+      headerMapping[originalHeader] = newHeader;
+    }
+  }
+  return headerMapping;
+}
+
+var headerMappings = getHeaderMappings();
+
+function customTransform_(data, row, column, options) {
+  // Define a mapping from original headers to new headers
+  //const headerMapping = getHeaderMappings();
+  const headerMapping = headerMappings;
+  //const headerMapping = {"Default Code": "SKU","Model": "Base Item"};
+
+  if (data[row][column] == null) {
+    if (row < 2 || hasOption_(options, "noInherit")) {
+      data[row][column] = "";
+    } else {
+      data[row][column] = data[row-1][column];
+    }
+  }
+
+  if (!hasOption_(options, "rawHeaders") && row == 0) {
+    if (column == 0 && data[row].length > 1) {
+      removeCommonPrefixes_(data, row);  
+    }
+    
+    // Replace header with mapped value or format it
+    let formattedHeader = data[row][column].toString().replace(/[\/\_]/g, " ");
+    formattedHeader = toTitleCase_(formattedHeader);    
+    data[row][column] = headerMapping[formattedHeader] || toTitleCase_(formattedHeader);
+  }
+
+  if (!hasOption_(options, "noTruncate") && data[row][column]) {
+    data[row][column] = data[row][column].toString().substr(0, 256);
+  }
+
+  if (hasOption_(options, "debugLocation")) {
+    data[row][column] = "[" + row + "," + column + "]" + data[row][column];
+  }
+}
+
+
 function ImportJSONBasicAuth(url, username, password, query, parseOptions) {
   var encodedAuthInformation = Utilities.base64Encode(username + ":" + password);
   var header = {headers: {Authorization: "Basic " + encodedAuthInformation}};
@@ -254,7 +308,7 @@ function ImportJSONBasicAuth(url, username, password, query, parseOptions) {
 }
 function ImportJSONCatalogIQ(url, api_key, query, parseOptions) {
   var header = {headers: {"Catalogiq-Api-Key": api_key}};
-  return ImportJSONAdvanced(url, header, query, parseOptions, includeXPath_, defaultTransform_);
+  return ImportJSONAdvanced(url, header, query, parseOptions, includeXPath_, customTransform_);
 }
 
 /** 
@@ -522,6 +576,21 @@ function defaultTransform_(data, row, column, options) {
     data[row][column] = "[" + row + "," + column + "]" + data[row][column];
   }
 }
+
+function flattenObject(obj, prefix = "") {
+  const result = {};
+  for (const key in obj) {
+    const value = obj[key];
+    const newPrefix = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === "object" && value !== null) {
+      Object.assign(result, flattenObject(value, newPrefix));
+    } else {
+      result[newPrefix] = value;
+    }
+  }
+  return result;
+}
+
 
 /** 
  * If all the values in the given row share the same prefix, remove that prefix.
