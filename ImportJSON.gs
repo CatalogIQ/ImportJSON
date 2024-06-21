@@ -133,7 +133,7 @@ function ImportJSONViaPost(url, payload, fetchOptions, query, parseOptions) {
   convertToBool_(postOptions, "followRedirects");
   convertToBool_(postOptions, "muteHttpExceptions");
   
-  return ImportJSONAdvanced(url, postOptions, query, parseOptions, includeXPath_, defaultTransform_);
+  return ImportJSONAdvanced(url, postOptions, query, parseOptions, includeXPath_, customTransform_);
 }
 
 /**
@@ -174,6 +174,26 @@ function ImportJSONFromSheet(sheetName, query, options) {
   var object = getDataFromNamedSheet_(sheetName);
   
   return parseJSONObject_(object, query, options, includeXPath_, defaultTransform_);
+}
+
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('CatalogIQ')
+    .addItem('Import Products from CatalogIQ API', 'showImportDialog')
+    .addToUi();
+}
+
+function showImportDialog() {
+  var htmlOutput = HtmlService.createHtmlOutputFromFile('ImportDialog')
+    .setWidth(600)
+    .setHeight(300);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Import JSON from CatalogIQ');
+}
+
+function importJSONCatalogIQFromDialog(url, apiKey, query, parseOptions="/results") {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = ImportJSONCatalogIQ(url, apiKey, query, parseOptions);
+  sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
 }
 
 
@@ -267,10 +287,8 @@ function getHeaderMappings() {
 var headerMappings = getHeaderMappings();
 
 function customTransform_(data, row, column, options) {
-  // Define a mapping from original headers to new headers
-  //const headerMapping = getHeaderMappings();
+
   const headerMapping = headerMappings;
-  //const headerMapping = {"Default Code": "SKU","Model": "Base Item"};
 
   if (data[row][column] == null) {
     if (row < 2 || hasOption_(options, "noInherit")) {
@@ -287,6 +305,7 @@ function customTransform_(data, row, column, options) {
     
     // Replace header with mapped value or format it
     let formattedHeader = data[row][column].toString().replace(/[\/\_]/g, " ");
+    formattedHeader.replace("results","");
     formattedHeader = toTitleCase_(formattedHeader);    
     data[row][column] = headerMapping[formattedHeader] || toTitleCase_(formattedHeader);
   }
